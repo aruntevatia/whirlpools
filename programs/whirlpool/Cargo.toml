@@ -22,7 +22,7 @@ spl-token = { version = "4.0.0", features=["no-entrypoint"] }
 
 #solana-program = "1.14.12"
 solana-program = "<1.17.0"
-bytemuck = "1.4"
+bytemuck = "1"
 thiserror = "1.0"
 uint = {version = "0.9.1", default-features = false}
 borsh = "0.9.3"
