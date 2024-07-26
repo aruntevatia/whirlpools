@@ -107,6 +107,7 @@ pub fn handler<'a, 'b, 'c, 'info>(
     sqrt_price_limit_one: u128,
     sqrt_price_limit_two: u128,
     remaining_accounts_info: Option<RemainingAccountsInfo>,
+
 ) -> Result<()> {
     let clock = Clock::get()?;
     // Update the global reward growth which increases as a function of time.
@@ -188,6 +189,7 @@ pub fn handler<'a, 'b, 'c, 'info>(
             amount_specified_is_input, // true
             a_to_b_one,
             timestamp,
+            clock.epoch
         )?;
 
         // Swap two input is the output of swap one
@@ -208,6 +210,7 @@ pub fn handler<'a, 'b, 'c, 'info>(
             amount_specified_is_input, // true
             a_to_b_two,
             timestamp,
+            clock.epoch
         )?;
         (swap_calc_one, swap_calc_two)
     } else {
@@ -224,18 +227,21 @@ pub fn handler<'a, 'b, 'c, 'info>(
             amount_specified_is_input, // false
             a_to_b_two,
             timestamp,
+            clock.epoch
         )?;
 
         // The output of swap 1 is input of swap_calc_two
         let swap_one_output_amount = if a_to_b_two {
             calculate_transfer_fee_excluded_amount(
                 &ctx.accounts.token_mint_intermediate,
-                swap_calc_two.amount_a
+                swap_calc_two.amount_a,
+                clock.epoch
             )?.amount
         } else {
             calculate_transfer_fee_excluded_amount(
                 &ctx.accounts.token_mint_intermediate,
-                swap_calc_two.amount_b
+                swap_calc_two.amount_b,
+                clock.epoch
             )?.amount
         };
 
@@ -249,6 +255,7 @@ pub fn handler<'a, 'b, 'c, 'info>(
             amount_specified_is_input, // false
             a_to_b_one,
             timestamp,
+            clock.epoch
         )?;
         (swap_calc_one, swap_calc_two)
     };
@@ -266,12 +273,14 @@ pub fn handler<'a, 'b, 'c, 'info>(
         let output_amount = if a_to_b_two {
             calculate_transfer_fee_excluded_amount(
                 &ctx.accounts.token_mint_output,
-                swap_update_two.amount_b
+                swap_update_two.amount_b,
+                clock.epoch
             )?.amount
         } else {
             calculate_transfer_fee_excluded_amount(
                 &ctx.accounts.token_mint_output,
-                swap_update_two.amount_a
+                swap_update_two.amount_a,
+                clock.epoch
             )?.amount
         };
 
@@ -360,5 +369,6 @@ pub fn handler<'a, 'b, 'c, 'info>(
         &ctx.accounts.memo_program,
         timestamp,
         transfer_memo::TRANSFER_MEMO_SWAP.as_bytes(),
+        clock.epoch
     )
 }
