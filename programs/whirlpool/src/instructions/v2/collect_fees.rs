@@ -53,6 +53,8 @@ pub fn handler<'info>(
     ctx: Context<'_, '_, '_, 'info, CollectFeesV2<'info>>,
     remaining_accounts_info: Option<RemainingAccountsInfo>,
 ) -> Result<()> {
+    let clock: Clock = Clock::get()?;
+
     verify_position_authority(
         &ctx.accounts.position_token_account,
         &ctx.accounts.position_authority,
@@ -83,6 +85,7 @@ pub fn handler<'info>(
         &remaining_accounts.transfer_hook_a,
         fee_owed_a,
         transfer_memo::TRANSFER_MEMO_COLLECT_FEES.as_bytes(),
+        clock.epoch,
     )?;
 
     transfer_from_vault_to_owner_v2(
@@ -95,6 +98,7 @@ pub fn handler<'info>(
         &remaining_accounts.transfer_hook_b,
         fee_owed_b,
         transfer_memo::TRANSFER_MEMO_COLLECT_FEES.as_bytes(),
+        clock.epoch,
     )?;
 
     Ok(())

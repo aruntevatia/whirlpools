@@ -1,26 +1,21 @@
 use anchor_lang::prelude::*;
 
-use crate::constants::transfer_memo;
 use crate::errors::ErrorCode;
 use crate::manager::liquidity_manager::{
     calculate_liquidity_token_deltas, calculate_modify_liquidity, sync_modify_liquidity_values,
 };
 use crate::math::convert_to_liquidity_delta;
-use crate::util::{
-    calculate_transfer_fee_excluded_amount, parse_remaining_accounts, AccountsType,
-    RemainingAccountsInfo,
-};
-use crate::util::{
-    to_timestamp_u64, v2::transfer_from_vault_to_owner_v2, verify_position_authority,
-};
+use crate::util::{calculate_transfer_fee_excluded_amount, parse_remaining_accounts, AccountsType, RemainingAccountsInfo};
+use crate::util::{to_timestamp_u64, v2::transfer_from_vault_to_owner_v2, verify_position_authority};
+use crate::constants::transfer_memo;
 
-use super::increase_liquidity::ModifyLiquidityV2;
+use super::ModifyLiquidityV2;
 
 /*
   Removes liquidity from an existing Whirlpool Position.
 */
-pub fn handler<'info>(
-    ctx: Context<'_, '_, '_, 'info, ModifyLiquidityV2<'info>>,
+pub fn handler<'a, 'b, 'c, 'info>(
+    ctx: Context<'a, 'b, 'c, 'info, ModifyLiquidityV2<'info>>,
     liquidity_amount: u128,
     token_min_a: u64,
     token_min_b: u64,
@@ -31,7 +26,7 @@ pub fn handler<'info>(
         &ctx.accounts.position_authority,
     )?;
 
-    let clock = Clock::get()?;
+    let clock: Clock = Clock::get()?;
 
     if liquidity_amount == 0 {
         return Err(ErrorCode::LiquidityZero.into());
@@ -39,9 +34,12 @@ pub fn handler<'info>(
 
     // Process remaining accounts
     let remaining_accounts = parse_remaining_accounts(
-        ctx.remaining_accounts,
+        &ctx.remaining_accounts,
         &remaining_accounts_info,
-        &[AccountsType::TransferHookA, AccountsType::TransferHookB],
+        &[
+            AccountsType::TransferHookA,
+            AccountsType::TransferHookB,
+        ],
     )?;
 
     let liquidity_delta = convert_to_liquidity_delta(liquidity_amount, false)?;
@@ -72,10 +70,16 @@ pub fn handler<'info>(
         liquidity_delta,
     )?;
 
-    let transfer_fee_excluded_delta_a =
-        calculate_transfer_fee_excluded_amount(&ctx.accounts.token_mint_a, delta_a)?;
-    let transfer_fee_excluded_delta_b =
-        calculate_transfer_fee_excluded_amount(&ctx.accounts.token_mint_b, delta_b)?;
+    let transfer_fee_excluded_delta_a = calculate_transfer_fee_excluded_amount(
+        &ctx.accounts.token_mint_a,
+        delta_a,
+        clock.epoch
+    )?;
+    let transfer_fee_excluded_delta_b = calculate_transfer_fee_excluded_amount(
+        &ctx.accounts.token_mint_b,
+        delta_b,
+        clock.epoch
+    )?;
 
     // token_min_a and token_min_b should be applied to the transfer fee excluded amount
     if transfer_fee_excluded_delta_a.amount < token_min_a {
@@ -95,6 +99,7 @@ pub fn handler<'info>(
         &remaining_accounts.transfer_hook_a,
         delta_a,
         transfer_memo::TRANSFER_MEMO_DECREASE_LIQUIDITY.as_bytes(),
+        clock.epoch
     )?;
 
     transfer_from_vault_to_owner_v2(
@@ -107,6 +112,7 @@ pub fn handler<'info>(
         &remaining_accounts.transfer_hook_b,
         delta_b,
         transfer_memo::TRANSFER_MEMO_DECREASE_LIQUIDITY.as_bytes(),
+        clock.epoch
     )?;
 
     Ok(())

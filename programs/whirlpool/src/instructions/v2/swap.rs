@@ -1,27 +1,21 @@
 use anchor_lang::prelude::*;
-use anchor_spl::memo::Memo;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+use anchor_spl::memo::Memo;
 
-use crate::util::{
-    calculate_transfer_fee_excluded_amount, calculate_transfer_fee_included_amount,
-    parse_remaining_accounts, AccountsType, RemainingAccountsInfo,
-};
+use crate::util::{calculate_transfer_fee_excluded_amount, calculate_transfer_fee_included_amount, parse_remaining_accounts, AccountsType, RemainingAccountsInfo};
 use crate::{
-    constants::transfer_memo,
     errors::ErrorCode,
     manager::swap_manager::*,
-    state::Whirlpool,
-    util::{
-        to_timestamp_u64, v2::update_and_swap_whirlpool_v2, SparseSwapTickSequenceBuilder,
-        SwapTickSequence,
-    },
+    state::{TickArray, Whirlpool},
+    util::{to_timestamp_u64, v2::update_and_swap_whirlpool_v2, SwapTickSequence},
+    constants::transfer_memo,
 };
 
 #[derive(Accounts)]
 pub struct SwapV2<'info> {
-    #[account(address = *token_mint_a.to_account_info().owner)]
+    #[account(address = token_mint_a.to_account_info().owner.clone())]
     pub token_program_a: Interface<'info, TokenInterface>,
-    #[account(address = *token_mint_b.to_account_info().owner)]
+    #[account(address = token_mint_b.to_account_info().owner.clone())]
     pub token_program_b: Interface<'info, TokenInterface>,
 
     pub memo_program: Program<'info, Memo>,
@@ -35,7 +29,7 @@ pub struct SwapV2<'info> {
     pub token_mint_a: InterfaceAccount<'info, Mint>,
     #[account(address = whirlpool.token_mint_b)]
     pub token_mint_b: InterfaceAccount<'info, Mint>,
-
+    
     #[account(mut, constraint = token_owner_account_a.mint == whirlpool.token_mint_a)]
     pub token_owner_account_a: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(mut, address = whirlpool.token_vault_a)]
@@ -46,29 +40,26 @@ pub struct SwapV2<'info> {
     #[account(mut, address = whirlpool.token_vault_b)]
     pub token_vault_b: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    #[account(mut)]
-    /// CHECK: checked in the handler
-    pub tick_array_0: UncheckedAccount<'info>,
+    #[account(mut, has_one = whirlpool)]
+    pub tick_array_0: AccountLoader<'info, TickArray>,
 
-    #[account(mut)]
-    /// CHECK: checked in the handler
-    pub tick_array_1: UncheckedAccount<'info>,
+    #[account(mut, has_one = whirlpool)]
+    pub tick_array_1: AccountLoader<'info, TickArray>,
 
-    #[account(mut)]
-    /// CHECK: checked in the handler
-    pub tick_array_2: UncheckedAccount<'info>,
+    #[account(mut, has_one = whirlpool)]
+    pub tick_array_2: AccountLoader<'info, TickArray>,
 
     #[account(mut, seeds = [b"oracle", whirlpool.key().as_ref()], bump)]
     /// CHECK: Oracle is currently unused and will be enabled on subsequent updates
     pub oracle: UncheckedAccount<'info>,
+
     // remaining accounts
     // - accounts for transfer hook program of token_mint_a
     // - accounts for transfer hook program of token_mint_b
-    // - supplemental TickArray accounts
 }
 
-pub fn handler<'info>(
-    ctx: Context<'_, '_, '_, 'info, SwapV2<'info>>,
+pub fn handler<'a, 'b, 'c, 'info>(
+    ctx: Context<'a, 'b, 'c, 'info, SwapV2<'info>>,
     amount: u64,
     other_amount_threshold: u64,
     sqrt_price_limit: u128,
@@ -83,29 +74,22 @@ pub fn handler<'info>(
 
     // Process remaining accounts
     let remaining_accounts = parse_remaining_accounts(
-        ctx.remaining_accounts,
+        &ctx.remaining_accounts,
         &remaining_accounts_info,
         &[
             AccountsType::TransferHookA,
             AccountsType::TransferHookB,
-            AccountsType::SupplementalTickArrays,
         ],
     )?;
 
-    let builder = SparseSwapTickSequenceBuilder::try_from(
-        whirlpool,
-        a_to_b,
-        vec![
-            ctx.accounts.tick_array_0.to_account_info(),
-            ctx.accounts.tick_array_1.to_account_info(),
-            ctx.accounts.tick_array_2.to_account_info(),
-        ],
-        remaining_accounts.supplemental_tick_arrays,
-    )?;
-    let mut swap_tick_sequence = builder.build()?;
+    let mut swap_tick_sequence = SwapTickSequence::new(
+        ctx.accounts.tick_array_0.load_mut().unwrap(),
+        ctx.accounts.tick_array_1.load_mut().ok(),
+        ctx.accounts.tick_array_2.load_mut().ok(),
+    );
 
     let swap_update = swap_with_transfer_fee_extension(
-        whirlpool,
+        &whirlpool,
         &ctx.accounts.token_mint_a,
         &ctx.accounts.token_mint_b,
         &mut swap_tick_sequence,
@@ -114,6 +98,7 @@ pub fn handler<'info>(
         amount_specified_is_input,
         a_to_b,
         timestamp,
+        clock.epoch
     )?;
 
     if amount_specified_is_input {
@@ -121,14 +106,14 @@ pub fn handler<'info>(
             calculate_transfer_fee_excluded_amount(
                 &ctx.accounts.token_mint_b,
                 swap_update.amount_b,
-            )?
-            .amount
+                clock.epoch
+            )?.amount
         } else {
             calculate_transfer_fee_excluded_amount(
                 &ctx.accounts.token_mint_a,
                 swap_update.amount_a,
-            )?
-            .amount
+                clock.epoch
+            )?.amount
         };
         if transfer_fee_excluded_output_amount < other_amount_threshold {
             return Err(ErrorCode::AmountOutBelowMinimum.into());
@@ -162,10 +147,10 @@ pub fn handler<'info>(
         a_to_b,
         timestamp,
         transfer_memo::TRANSFER_MEMO_SWAP.as_bytes(),
+        clock.epoch
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn swap_with_transfer_fee_extension<'info>(
     whirlpool: &Whirlpool,
     token_mint_a: &InterfaceAccount<'info, Mint>,
@@ -176,6 +161,7 @@ pub fn swap_with_transfer_fee_extension<'info>(
     amount_specified_is_input: bool,
     a_to_b: bool,
     timestamp: u64,
+    epoch:u64
 ) -> Result<PostSwapUpdate> {
     let (input_token_mint, output_token_mint) = if a_to_b {
         (token_mint_a, token_mint_b)
@@ -186,9 +172,11 @@ pub fn swap_with_transfer_fee_extension<'info>(
     // ExactIn
     if amount_specified_is_input {
         let transfer_fee_included_input = amount;
-        let transfer_fee_excluded_input =
-            calculate_transfer_fee_excluded_amount(input_token_mint, transfer_fee_included_input)?
-                .amount;
+        let transfer_fee_excluded_input = calculate_transfer_fee_excluded_amount(
+            input_token_mint,
+            transfer_fee_included_input,
+            epoch
+        )?.amount;
 
         let swap_update = swap(
             whirlpool,
@@ -211,22 +199,19 @@ pub fn swap_with_transfer_fee_extension<'info>(
         let adjusted_transfer_fee_included_input = if fullfilled {
             transfer_fee_included_input
         } else {
-            calculate_transfer_fee_included_amount(input_token_mint, swap_update_amount_input)?
-                .amount
+            calculate_transfer_fee_included_amount(
+                input_token_mint,
+                swap_update_amount_input,
+                epoch
+            )?.amount
         };
 
         let transfer_fee_included_output = swap_update_amount_output;
 
         let (amount_a, amount_b) = if a_to_b {
-            (
-                adjusted_transfer_fee_included_input,
-                transfer_fee_included_output,
-            )
+            (adjusted_transfer_fee_included_input, transfer_fee_included_output)
         } else {
-            (
-                transfer_fee_included_output,
-                adjusted_transfer_fee_included_input,
-            )
+            (transfer_fee_included_output, adjusted_transfer_fee_included_input)
         };
         return Ok(PostSwapUpdate {
             amount_a, // updated (transfer fee included)
@@ -242,9 +227,11 @@ pub fn swap_with_transfer_fee_extension<'info>(
 
     // ExactOut
     let transfer_fee_excluded_output = amount;
-    let transfer_fee_included_output =
-        calculate_transfer_fee_included_amount(output_token_mint, transfer_fee_excluded_output)?
-            .amount;
+    let transfer_fee_included_output = calculate_transfer_fee_included_amount(
+        output_token_mint,
+        transfer_fee_excluded_output,
+        epoch
+    )?.amount;
 
     let swap_update = swap(
         whirlpool,
@@ -262,21 +249,18 @@ pub fn swap_with_transfer_fee_extension<'info>(
         (swap_update.amount_b, swap_update.amount_a)
     };
 
-    let transfer_fee_included_input =
-        calculate_transfer_fee_included_amount(input_token_mint, swap_update_amount_input)?.amount;
+    let transfer_fee_included_input = calculate_transfer_fee_included_amount(
+        input_token_mint,
+        swap_update_amount_input,
+        epoch
+    )?.amount;
 
     let adjusted_transfer_fee_included_output = swap_update_amount_output;
 
     let (amount_a, amount_b) = if a_to_b {
-        (
-            transfer_fee_included_input,
-            adjusted_transfer_fee_included_output,
-        )
+        (transfer_fee_included_input, adjusted_transfer_fee_included_output)
     } else {
-        (
-            adjusted_transfer_fee_included_output,
-            transfer_fee_included_input,
-        )
+        (adjusted_transfer_fee_included_output, transfer_fee_included_input)
     };
     Ok(PostSwapUpdate {
         amount_a, // updated (transfer fee included)
@@ -287,5 +271,5 @@ pub fn swap_with_transfer_fee_extension<'info>(
         next_fee_growth_global: swap_update.next_fee_growth_global,
         next_reward_infos: swap_update.next_reward_infos,
         next_protocol_fee: swap_update.next_protocol_fee,
-    })
+    })    
 }

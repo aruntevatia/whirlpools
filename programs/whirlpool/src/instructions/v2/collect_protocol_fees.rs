@@ -45,6 +45,8 @@ pub fn handler<'info>(
     ctx: Context<'_, '_, '_, 'info, CollectProtocolFeesV2<'info>>,
     remaining_accounts_info: Option<RemainingAccountsInfo>,
 ) -> Result<()> {
+    let clock: Clock = Clock::get()?;
+
     let whirlpool = &ctx.accounts.whirlpool;
 
     // Process remaining accounts
@@ -64,6 +66,7 @@ pub fn handler<'info>(
         &remaining_accounts.transfer_hook_a,
         whirlpool.protocol_fee_owed_a,
         transfer_memo::TRANSFER_MEMO_COLLECT_PROTOCOL_FEES.as_bytes(),
+        clock.epoch
     )?;
 
     transfer_from_vault_to_owner_v2(
@@ -76,6 +79,7 @@ pub fn handler<'info>(
         &remaining_accounts.transfer_hook_b,
         whirlpool.protocol_fee_owed_b,
         transfer_memo::TRANSFER_MEMO_COLLECT_PROTOCOL_FEES.as_bytes(),
+        clock.epoch
     )?;
 
     ctx.accounts.whirlpool.reset_protocol_fees_owed();
