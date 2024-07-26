@@ -25,6 +25,8 @@ pub fn update_and_swap_whirlpool_v2<'info>(
     is_token_fee_in_a: bool,
     reward_last_updated_timestamp: u64,
     memo: &[u8],
+    epoch:u64
+
 ) -> Result<()> {
     whirlpool.update_after_swap(
         swap_update.next_liquidity,
@@ -55,6 +57,7 @@ pub fn update_and_swap_whirlpool_v2<'info>(
         swap_update.amount_b,
         is_token_fee_in_a,
         memo,
+        epoch
     )
 }
 
@@ -77,6 +80,7 @@ fn perform_swap_v2<'info>(
     amount_b: u64,
     a_to_b: bool,
     memo: &[u8],
+    epoch:u64
 ) -> Result<()> {
     // Transfer from user to pool
     let deposit_token_program;
@@ -133,6 +137,7 @@ fn perform_swap_v2<'info>(
         memo_program,
         deposit_transfer_hook_accounts,
         deposit_amount,
+        epoch
     )?;
 
     transfer_from_vault_to_owner_v2(
@@ -145,6 +150,7 @@ fn perform_swap_v2<'info>(
         withdrawal_transfer_hook_accounts,
         withdrawal_amount,
         memo,
+        epoch
     )?;
 
     Ok(())
@@ -185,6 +191,8 @@ pub fn update_and_two_hop_swap_whirlpool_v2<'info>(
     memo_program: &Program<'info, Memo>,
     reward_last_updated_timestamp: u64,
     memo: &[u8],
+    epoch:u64
+
 ) -> Result<()> {
     whirlpool_one.update_after_swap(
         swap_update_one.next_liquidity,
@@ -229,6 +237,7 @@ pub fn update_and_two_hop_swap_whirlpool_v2<'info>(
         memo_program,
         transfer_hook_accounts_input,
         input_amount,
+        epoch
     )?;
 
     // Transfer from pool to pool
@@ -242,6 +251,7 @@ pub fn update_and_two_hop_swap_whirlpool_v2<'info>(
         transfer_hook_accounts_intermediate,
         intermediate_amount,
         memo,
+        epoch
     )?;
 
     transfer_from_vault_to_owner_v2(
@@ -254,6 +264,7 @@ pub fn update_and_two_hop_swap_whirlpool_v2<'info>(
         transfer_hook_accounts_output,
         output_amount,
         memo,
+        epoch
     )?;
 
     Ok(())
