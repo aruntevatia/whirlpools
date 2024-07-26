@@ -390,7 +390,6 @@ pub fn get_epoch_transfer_fee<'info>(
     let token_mint_data = token_mint_info.try_borrow_data()?;
     let token_mint_unpacked = StateWithExtensions::<spl_token_2022::state::Mint>::unpack(&token_mint_data)?;
     if let Ok(transfer_fee_config) = token_mint_unpacked.get_extension::<extension::transfer_fee::TransferFeeConfig>() {
-        let epoch = Clock::get()?.epoch;
         return Ok(Some(transfer_fee_config.get_epoch_fee(epoch).clone()));
     }
 
