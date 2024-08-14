@@ -2427,7 +2427,11 @@ dependencies = [
  "spl-discriminator",
  "spl-pod",
  "spl-program-error",
+<<<<<<< HEAD
  "spl-tlv-account-resolution 0.5.1",
+=======
+ "spl-tlv-account-resolution 0.5.2",
+>>>>>>> 647e116 (1)
  "spl-type-length-value",
 ]
 
