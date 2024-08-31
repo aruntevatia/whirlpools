@@ -39,9 +39,9 @@ pub struct CollectFeesV2<'info> {
     #[account(mut, address = whirlpool.token_vault_b)]
     pub token_vault_b: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    #[account(address = token_mint_a.to_account_info().owner.clone())]
+    #[account(address = *token_mint_a.to_account_info().owner)]
     pub token_program_a: Interface<'info, TokenInterface>,
-    #[account(address = token_mint_b.to_account_info().owner.clone())]
+    #[account(address = *token_mint_b.to_account_info().owner)]
     pub token_program_b: Interface<'info, TokenInterface>,
     pub memo_program: Program<'info, Memo>,
     // remaining accounts
@@ -49,8 +49,8 @@ pub struct CollectFeesV2<'info> {
     // - accounts for transfer hook program of token_mint_b
 }
 
-pub fn handler<'a, 'b, 'c, 'info>(
-    ctx: Context<'a, 'b, 'c, 'info, CollectFeesV2<'info>>,
+pub fn handler<'info>(
+    ctx: Context<'_, '_, '_, 'info, CollectFeesV2<'info>>,
     remaining_accounts_info: Option<RemainingAccountsInfo>,
 ) -> Result<()> {
     let clock: Clock = Clock::get()?;
@@ -62,7 +62,7 @@ pub fn handler<'a, 'b, 'c, 'info>(
 
     // Process remaining accounts
     let remaining_accounts = parse_remaining_accounts(
-        &ctx.remaining_accounts,
+        ctx.remaining_accounts,
         &remaining_accounts_info,
         &[AccountsType::TransferHookA, AccountsType::TransferHookB],
     )?;

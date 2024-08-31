@@ -1,8 +1,8 @@
 use crate::util::{parse_remaining_accounts, AccountsType, RemainingAccountsInfo};
 use crate::{constants::transfer_memo, state::*, util::v2::transfer_from_vault_to_owner_v2};
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use anchor_spl::memo::Memo;
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
 #[derive(Accounts)]
 pub struct CollectProtocolFeesV2<'info> {
@@ -31,19 +31,18 @@ pub struct CollectProtocolFeesV2<'info> {
     #[account(mut, constraint = token_destination_b.mint == whirlpool.token_mint_b)]
     pub token_destination_b: InterfaceAccount<'info, TokenAccount>,
 
-    #[account(address = token_mint_a.to_account_info().owner.clone())]
+    #[account(address = *token_mint_a.to_account_info().owner)]
     pub token_program_a: Interface<'info, TokenInterface>,
-    #[account(address = token_mint_b.to_account_info().owner.clone())]
+    #[account(address = *token_mint_b.to_account_info().owner)]
     pub token_program_b: Interface<'info, TokenInterface>,
     pub memo_program: Program<'info, Memo>,
-
     // remaining accounts
     // - accounts for transfer hook program of token_mint_a
     // - accounts for transfer hook program of token_mint_b
 }
 
-pub fn handler<'a, 'b, 'c, 'info>(
-    ctx: Context<'a, 'b, 'c, 'info, CollectProtocolFeesV2<'info>>,
+pub fn handler<'info>(
+    ctx: Context<'_, '_, '_, 'info, CollectProtocolFeesV2<'info>>,
     remaining_accounts_info: Option<RemainingAccountsInfo>,
 ) -> Result<()> {
     let clock: Clock = Clock::get()?;
@@ -52,12 +51,9 @@ pub fn handler<'a, 'b, 'c, 'info>(
 
     // Process remaining accounts
     let remaining_accounts = parse_remaining_accounts(
-        &ctx.remaining_accounts,
+        ctx.remaining_accounts,
         &remaining_accounts_info,
-        &[
-            AccountsType::TransferHookA,
-            AccountsType::TransferHookB,
-        ],
+        &[AccountsType::TransferHookA, AccountsType::TransferHookB],
     )?;
 
     transfer_from_vault_to_owner_v2(
@@ -86,5 +82,6 @@ pub fn handler<'a, 'b, 'c, 'info>(
         clock.epoch
     )?;
 
-    Ok(ctx.accounts.whirlpool.reset_protocol_fees_owed())
+    ctx.accounts.whirlpool.reset_protocol_fees_owed();
+    Ok(())
 }

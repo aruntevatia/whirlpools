@@ -10,6 +10,10 @@ inputs:
     description: 'The version of anchor to use.'
     required: false
     default: 'v0.29.0'
+  rust-version:
+    description: 'The version of rust to use.'
+    required: false
+    default: '1.80'
   solana-key:
     description: 'The private key to use for the solana sdk.'
     required: false
@@ -29,10 +33,16 @@ runs:
         chmod +x run
         echo "#!/bin/bash" >> run
         echo "set -xeo pipefail" >> run
+        echo "export RUST_LOG=" >> run
       shell: bash
     - name: Install Dependencies
       run: |
         echo "yarn" >> run
+      shell: bash
+    - name: Update rustc
+      run: |
+        echo "rustup install ${{ inputs.rust-version }}" >> run
+        echo "rustup default ${{ inputs.rust-version }}" >> run
       shell: bash
     - name: Configure Solana
       run: |

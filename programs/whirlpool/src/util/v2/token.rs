@@ -1,3 +1,4 @@
+use crate::errors::ErrorCode;
 use crate::state::{TokenBadge, Whirlpool};
 use crate::errors::ErrorCode;
 use anchor_lang::prelude::*;
