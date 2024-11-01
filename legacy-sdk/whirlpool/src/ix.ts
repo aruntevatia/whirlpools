@@ -196,6 +196,10 @@ export class WhirlpoolIx {
    * - `TickArrayIndexOutofBounds` - The swap loop attempted to access an invalid array index during tick crossing.
    * - `LiquidityOverflow` - Liquidity value overflowed 128bits during tick crossing.
    * - `InvalidTickSpacing` - The swap pool was initialized with tick-spacing of 0.
+   * - `AmountCalcOverflow` - The required token amount exceeds the u64 range.
+   * - `AmountRemainingOverflow` - Result does not match the specified amount.
+   * - `DifferentWhirlpoolTickArrayAccount` - The provided tick array account does not belong to the whirlpool.
+   * - `PartialFillError` - Partially filled when sqrtPriceLimit = 0 and amountSpecifiedIsInput = false.
    *
    * ### Parameters
    * @param program - program object containing services required to generate the instruction
@@ -220,6 +224,11 @@ export class WhirlpoolIx {
    * - `InvalidTickSpacing` - The swap pool was initialized with tick-spacing of 0.
    * - `DuplicateTwoHopPool` - Swaps on the same pool are not allowed.
    * - `InvalidIntermediaryMint` - The first and second leg of the hops do not share a common token.
+   * - `AmountCalcOverflow` - The required token amount exceeds the u64 range.
+   * - `AmountRemainingOverflow` - Result does not match the specified amount.
+   * - `DifferentWhirlpoolTickArrayAccount` - The provided tick array account does not belong to the whirlpool.
+   * - `PartialFillError` - Partially filled when sqrtPriceLimit = 0 and amountSpecifiedIsInput = false.
+   * - `IntermediateTokenAmountMismatch` - The amount of tokens received from the first hop does not match the amount sent to the second hop.
    *
    * ### Parameters
    * @param program - program object containing services required to generate the instruction
@@ -556,6 +565,42 @@ export class WhirlpoolIx {
     params: ix.CloseBundledPositionParams,
   ) {
     return ix.closeBundledPositionIx(program, params);
+  }
+
+  /**
+   * Open a position in a Whirlpool. A unique token will be minted to represent the position
+   * in the users wallet. Additional TokenMetadata extension is initialized to identify the token if requested.
+   * Mint and Token account are based on Token-2022.
+   * The position will start off with 0 liquidity.
+   *
+   * #### Special Errors
+   * `InvalidTickIndex` - If a provided tick is out of bounds, out of order or not a multiple of the tick-spacing in this pool.
+   *
+   * @param context - Context object containing services required to generate the instruction
+   * @param params - OpenPositionWithTokenExtensionsParams object and a derived PDA that hosts the position's metadata.
+   * @returns - Instruction to perform the action.
+   */
+  public static openPositionWithTokenExtensionsIx(
+    program: Program<Whirlpool>,
+    params: ix.OpenPositionWithTokenExtensionsParams,
+  ) {
+    return ix.openPositionWithTokenExtensionsIx(program, params);
+  }
+
+  /**
+   * Close a position in a Whirlpool. Burns the position token in the owner's wallet.
+   * Mint and TokenAccount are based on Token-2022. And Mint accout will be also closed.
+   *
+   * @category Instructions
+   * @param context - Context object containing services required to generate the instruction
+   * @param params - ClosePositionWithTokenExtensionsParams object
+   * @returns - Instruction to perform the action.
+   */
+  public static closePositionWithTokenExtensionsIx(
+    program: Program<Whirlpool>,
+    params: ix.ClosePositionWithTokenExtensionsParams,
+  ) {
+    return ix.closePositionWithTokenExtensionsIx(program, params);
   }
 
   // V2 instructions

@@ -1,7 +1,7 @@
 {
   "name": "@orca-so/whirlpools-monorepo",
   "private": true,
-  "packageManager": "yarn@4.4.0",
+  "packageManager": "yarn@4.5.1",
   "type": "module",
   "scripts": {
     "build": "nx run-many --target build --projects",
@@ -13,17 +13,13 @@
     "prepare": "husky install"
   },
   "devDependencies": {
-    "@types/bn.js": "~5.1.5",
-    "@types/mocha": "^10.0.7",
-    "@types/node": "^22.5.1",
-    "@types/sinon": "^17.0.3",
-    "husky": "^9.1.5",
-    "lint-staged": "^15.2.9",
-    "mocha": "^10.7.3",
-    "nx": "^19.6.4",
+    "@types/node": "^22.8.5",
+    "husky": "^9.1.6",
+    "lint-staged": "^15.2.10",
+    "nx": "^20.0.6",
     "rimraf": "^6.0.1",
-    "sinon": "^18.0.0",
-    "ts-mocha": "^10.0.0"
+    "tsup": "^8.3.5",
+    "vitest": "^2.1.4"
   },
   "workspaces": [
     "programs/*",

@@ -38,6 +38,7 @@ import {
   createReallocateInstruction,
   getAccount,
   getAccountLen,
+  getAccountTypeOfMintType,
   getAssociatedTokenAddressSync,
   getExtensionTypes,
   getMemoTransfer,
@@ -245,7 +246,7 @@ async function createMintInstructions(
         createInitializeInterestBearingMintInstruction(
           mint,
           authority,
-          1,
+          tokenTrait.interestBearingRate ?? 1, // default 1/10000
           TEST_TOKEN_2022_PROGRAM_ID,
         ),
       );
@@ -360,8 +361,8 @@ async function createMintInstructions(
       const groupData: TokenGroup = {
         mint,
         updateAuthority: authority,
-        maxSize: 10,
-        size: 10,
+        maxSize: 10n,
+        size: 10n,
       };
 
       const tokenGroupSize = packTokenGroup(groupData).length;
@@ -385,7 +386,7 @@ async function createMintInstructions(
       const groupMemberData: TokenGroupMember = {
         mint: mint,
         group: mint,
-        memberNumber: 10,
+        memberNumber: 10n,
       };
 
       const tokenGroupMemberSize = packTokenGroupMember(groupMemberData).length;
@@ -1066,13 +1067,15 @@ function getAccountLenForMintHack(mintData: Mint): number {
   // spl-token cannot handle ConfidentialTransferFeeConfig yet, so we need to patch...
   // 16: ConfidentialTransferFeeConfig
   if (!extensionTypes.includes(16 as ExtensionType)) {
-    return getAccountLen(extensionTypes);
+    return getAccountLen(extensionTypes.map(getAccountTypeOfMintType));
   }
 
   const confidentialTransferFeeAmountLen = 2 + 2 + 64;
   return (
     getAccountLen(
-      extensionTypes.filter((type) => type !== (16 as ExtensionType)),
+      extensionTypes
+      .filter((type) => type !== (16 as ExtensionType))
+      .map(getAccountTypeOfMintType),
     ) + confidentialTransferFeeAmountLen
   );
 }
