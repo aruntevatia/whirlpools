@@ -19,20 +19,17 @@ export default {
     locales: ["en"],
   },
 
-  markdown: {
-    format: "md",
-  },
-
   staticDirectories: ["static", "../ts/dist", "../legacy/dist", "../rust/dist"],
 
   presets: [
     [
-      "classic",
+      "@docusaurus/preset-classic",
       {
         docs: {
           routeBasePath: "/",
           sidebarPath: "./sidebars.js",
-          editUrl: "https://github.com/orca-so/whirlpools/tree/main/docs/whirlpool",
+          editUrl:
+            "https://github.com/orca-so/whirlpools/tree/main/docs/whirlpool",
         },
         theme: {
           customCss: "./static/index.css",
@@ -52,16 +49,20 @@ export default {
       items: [
         { to: "/", label: "Docs", position: "left" },
         {
-          href: "/orca_whirlpools/",
-          label: "Rust SDK Reference",
+          label: "Whirlpools SDK Reference",
           position: "left",
-          target: "_blank",
-        },
-        {
-          href: "/ts/",
-          label: "TS SDK Reference",
-          position: "left",
-          target: "_blank",
+          items: [
+            {
+              href: "/ts/",
+              label: "TS SDK Reference",
+              target: "_blank",
+            },
+            {
+              href: "/orca_whirlpools_docs/",
+              label: "Rust SDK Reference",
+              target: "_blank",
+            },
+          ],
         },
         {
           href: "/legacy/",

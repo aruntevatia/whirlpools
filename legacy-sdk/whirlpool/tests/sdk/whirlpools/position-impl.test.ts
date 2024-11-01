@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Percentage } from "@orca-so/common-sdk";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { getAssociatedTokenAddressSync, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import * as assert from "assert";
 import Decimal from "decimal.js";
 import {
@@ -20,7 +20,7 @@ import { defaultConfirmOptions } from "../../utils/const";
 import { initPosition } from "../../utils/test-builders";
 import { TokenExtensionUtil } from "../../../src/utils/public/token-extension-util";
 import type { TokenTrait } from "../../utils/v2/init-utils-v2";
-import { initTestPoolV2 } from "../../utils/v2/init-utils-v2";
+import { initTestPoolV2, useMaxCU } from "../../utils/v2/init-utils-v2";
 import { mintTokensToTestAccountV2 } from "../../utils/v2/token-2022";
 
 describe("position-impl", () => {
@@ -140,7 +140,9 @@ describe("position-impl", () => {
             false,
             ctx.wallet.publicKey,
           )
-        ).buildAndExecute();
+        )
+        .prependInstruction(useMaxCU())  // TransferHook require much CU
+        .buildAndExecute();
 
         const postIncreaseData = await position.refreshData();
         const expectedPostIncreaseLiquidity = preIncreaseData.liquidity.add(
@@ -167,7 +169,9 @@ describe("position-impl", () => {
 
         await (
           await position.decreaseLiquidity(decrease_quote, false)
-        ).buildAndExecute();
+        )
+        .prependInstruction(useMaxCU())  // TransferHook require much CU
+        .buildAndExecute();
 
         const postWithdrawData = await position.refreshData();
         const expectedPostWithdrawLiquidity = postIncreaseData.liquidity.sub(
@@ -253,7 +257,9 @@ describe("position-impl", () => {
 
         await (
           await position.increaseLiquidity(increase_quote, false)
-        ).buildAndExecute();
+        )
+        .prependInstruction(useMaxCU())  // TransferHook require much CU
+        .buildAndExecute();
 
         const postIncreaseData = await position.refreshData();
         const expectedPostIncreaseLiquidity = preIncreaseData.liquidity.add(
@@ -331,6 +337,7 @@ describe("position-impl", () => {
           )
         )
           .addSigner(otherWallet)
+          .prependInstruction(useMaxCU())  // TransferHook require much CU
           .buildAndExecute();
 
         const postSecondIncreaseData = await position.refreshData();
@@ -346,11 +353,140 @@ describe("position-impl", () => {
           )
         )
           .addSigner(otherWallet)
+          .prependInstruction(useMaxCU())  // TransferHook require much CU
           .buildAndExecute();
 
         const postWithdrawData = await position.refreshData();
         const expectedPostWithdrawLiquidity =
           postSecondIncreaseData.liquidity.sub(decrease_quote.liquidityAmount);
+        assert.equal(
+          postWithdrawData.liquidity.toString(),
+          expectedPostWithdrawLiquidity.toString(),
+        );
+      });
+
+      it("increase and decrease liquidity on position (position with TokenExtensions)", async () => {
+        const { poolInitInfo } = await initTestPoolV2(
+          ctx,
+          tokenTraits.tokenTraitA,
+          tokenTraits.tokenTraitB,
+          TickSpacing.Standard,
+          PriceMath.priceToSqrtPriceX64(new Decimal(100), 6, 6),
+        );
+
+        // Create and mint tokens in this wallet
+        await mintTokensToTestAccountV2(
+          ctx.provider,
+          poolInitInfo.tokenMintA,
+          tokenTraits.tokenTraitA,
+          10_500_000_000,
+          poolInitInfo.tokenMintB,
+          tokenTraits.tokenTraitB,
+          10_500_000_000,
+        );
+
+        const pool = await client.getPool(poolInitInfo.whirlpoolPda.publicKey);
+        const lowerTick = PriceMath.priceToTickIndex(
+          new Decimal(89),
+          pool.getTokenAInfo().decimals,
+          pool.getTokenBInfo().decimals,
+        );
+        const upperTick = PriceMath.priceToTickIndex(
+          new Decimal(120),
+          pool.getTokenAInfo().decimals,
+          pool.getTokenBInfo().decimals,
+        );
+
+        // [Action] Initialize Tick Arrays
+        const initTickArrayTx = (await pool.initTickArrayForTicks([
+          lowerTick,
+          upperTick,
+        ]))!;
+        await initTickArrayTx.buildAndExecute();
+
+        // [Action] Create a position at price 89, 120 with 50 token A
+        const lowerPrice = new Decimal(89);
+        const upperPrice = new Decimal(120);
+        const { positionAddress } = await initPosition(
+          ctx,
+          pool,
+          lowerPrice,
+          upperPrice,
+          poolInitInfo.tokenMintA,
+          50,
+          undefined,
+          true, // withTokenExtensions
+        );
+
+        // [Action] Increase liquidity by 70 tokens of tokenB
+        const position = await client.getPosition(
+          positionAddress.publicKey,
+          IGNORE_CACHE,
+        );
+
+        // Verify position mint is owned by Token-2022
+        const positionMint = await fetcher.getMintInfo(position.getData().positionMint, IGNORE_CACHE);
+        assert.ok(positionMint?.tokenProgram.equals(TOKEN_2022_PROGRAM_ID));
+
+        const preIncreaseData = position.getData();
+        const increase_quote =
+          increaseLiquidityQuoteByInputTokenUsingPriceSlippage(
+            poolInitInfo.tokenMintB,
+            new Decimal(70),
+            lowerTick,
+            upperTick,
+            Percentage.fromFraction(1, 100),
+            pool,
+            await TokenExtensionUtil.buildTokenExtensionContext(
+              fetcher,
+              pool.getData(),
+              IGNORE_CACHE,
+            ),
+          );
+
+        await (
+          await position.increaseLiquidity(
+            increase_quote,
+            false,
+            ctx.wallet.publicKey,
+          )
+        )
+        .prependInstruction(useMaxCU())  // TransferHook require much CU
+        .buildAndExecute();
+
+        const postIncreaseData = await position.refreshData();
+        const expectedPostIncreaseLiquidity = preIncreaseData.liquidity.add(
+          increase_quote.liquidityAmount,
+        );
+        assert.equal(
+          postIncreaseData.liquidity.toString(),
+          expectedPostIncreaseLiquidity.toString(),
+        );
+
+        // [Action] Withdraw half of the liquidity away from the position and verify
+        const withdrawHalf = postIncreaseData.liquidity.div(new anchor.BN(2));
+        const decrease_quote = decreaseLiquidityQuoteByLiquidity(
+          withdrawHalf,
+          Percentage.fromFraction(0, 100),
+          position,
+          pool,
+          await TokenExtensionUtil.buildTokenExtensionContext(
+            fetcher,
+            pool.getData(),
+            IGNORE_CACHE,
+          ),
+        );
+
+        await (
+          await position.decreaseLiquidity(decrease_quote, false)
+        )
+        .prependInstruction(useMaxCU())  // TransferHook require much CU
+        .buildAndExecute();
+
+        const postWithdrawData = await position.refreshData();
+        const expectedPostWithdrawLiquidity = postIncreaseData.liquidity.sub(
+          decrease_quote.liquidityAmount,
+        );
         assert.equal(
           postWithdrawData.liquidity.toString(),
           expectedPostWithdrawLiquidity.toString(),
