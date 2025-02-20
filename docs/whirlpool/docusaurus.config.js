@@ -1,4 +1,6 @@
 import { themes } from "prism-react-renderer";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 
 export default {
   title: "Whirlpools",
@@ -30,12 +32,24 @@ export default {
           sidebarPath: "./sidebars.js",
           editUrl:
             "https://github.com/orca-so/whirlpools/tree/main/docs/whirlpool",
+          remarkPlugins: [remarkMath],
+          rehypePlugins: [rehypeKatex],
         },
         theme: {
           customCss: "./static/index.css",
         },
       },
     ],
+  ],
+
+  stylesheets: [
+    {
+      href: "https://cdn.jsdelivr.net/npm/katex@0.13.24/dist/katex.min.css",
+      type: "text/css",
+      integrity:
+        "sha384-odtC+0UGzzFL/6PNoE8rX/SPcQDXBJ+uRepguP4QkPCm2LBxH3FA3y+fKSiJ+AmM",
+      crossorigin: "anonymous",
+    },
   ],
 
   themeConfig: {
@@ -49,7 +63,7 @@ export default {
       items: [
         { to: "/", label: "Docs", position: "left" },
         {
-          label: "Whirlpools SDK Reference",
+          label: "Whirlpools SDKs Reference",
           position: "left",
           items: [
             {
@@ -67,6 +81,12 @@ export default {
         {
           href: "/legacy/",
           label: "Legacy SDK Reference",
+          position: "left",
+          target: "_blank",
+        },
+        {
+          href: "https://api.orca.so/docs",
+          label: "API Reference",
           position: "left",
           target: "_blank",
         },

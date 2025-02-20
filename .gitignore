@@ -25,3 +25,7 @@ generated
 .cache-loader
 .devcontainer
 **/Cargo.lock
+.next
+.env
+wallet.json
+solana-release

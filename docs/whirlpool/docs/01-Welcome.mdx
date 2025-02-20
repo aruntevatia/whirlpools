@@ -6,7 +6,7 @@ import DocCard from '@theme/DocCard';
 
 # Welcome
 
-Whirlpools is an open-sourced concentrated liquidity automated market maker (CLAMM) program built for the Solana ecosystem.
+On both the Solana and Eclipse networks, the Whirlpool Program runs as an open-sourced concentrated liquidity automated market maker (CLAMM). The program enables advanced DeFi operations such as creating liquidity pools and swapping.
 
 <DocCard item={{
   type: 'link',
@@ -15,33 +15,57 @@ Whirlpools is an open-sourced concentrated liquidity automated market maker (CLA
   description: 'https://github.com/orca-so/whirlpools'
 }} />
 
-## Introduction to Solana.
+## Overview of Orca Whirlpools SDK suite
 
-On Solana, all data is stored in what is referred to as accounts. The way accounts are organized on Solana is similar to a key-value store, where each entry in the database is called an account. The key is the account's address, and the value is the data stored in the account.
+![Overview of Orca Whirlpools SDK suite](../static/img/01-Welcome/orca-sdks-overview.png)
 
-Some accounts only store data, such as a token account for your favorite token. Other accounts store programs. For example, there is a Token Program responsible for managing token accounts and transfers. Every time you send a token, you're sending a transaction to the Token Program, which updates the balances of the accounts involved.
+Orca provides a range of SDKs that cater to different levels of development needs for interacting with the Whirlpool Program on Solana and Eclipse. Whether you are managing liquidity, building applications that require pool infrastructure, or building automation tools that interact with the program, our SDKs cover a spectrum of functionality from low-level granular control to high-level abstractions.
 
-The Whirlpools Program is also a program. It can create new data accounts if you instruct it to, and even set you as the owner of those accounts. Accounts that you can own include Splash Pools, Concentrated Liquidity Pools, and liquidity positions. For these accounts, you'll pay rent. But here's the good part: this is no ordinary rent—you get the full rent back if you decide to close the account! You only pay the transaction costs on the Solana network, which, as you may know, are very low. You can also instruct the program to swap tokens against one of the many liquidity pools that hold the tokens you'd like to trade.
+What follows is a brief overview of our SDK suite, distinguishing between the Whirlpools SDKs and the Legacy SDK, and explaining their intended purposes and relationships.
 
-You interact with the Solana network by sending transactions to interact with accounts. Transactions are a sequence of instructions that are executed atomically on the network. The execution logic for these instructions is stored in programs (smart contracts) that run on the network.
+### Whirlpools SDKs
 
-Interacting with the Solana network and its many existing programs is easier than you might think. There are several SDKs available to simplify the process.
+The Whirlpools SDKs are our primary set of SDKs designed to provide enhanced, modular interaction with the Whirlpool Program. This offering is divided into three main components:
 
-## Whirlpools SDK
+#### 1. High-Level SDK
+- **TypeScript**: [@orca-so/whirlpools](https://www.npmjs.com/package/@orca-so/whirlpools)
+  - Compatible with Solana Web3.js SDK version `^2.0`
+- **Rust**: [orca_whirlpools](https://crates.io/crates/orca_whirlpools)
+  - Compatible with Solana SDK versions `^1.18.0` but `<3.0.0`. By default, Cargo will install the latest version of Solana SDK `^v2`. This can cause dependcy issues when using older versions. To solve this you can apply a lockfile patch with the following command:
+    ```bash
+    cargo update solana-program:<current-version> --precise <required-version>
+    ```
+    You might also have to apply lockfile patches for `solana-program`, `solana-client`, `solana-account-decoder`, `spl-token`, `spl-memo`, `spl-token-2022`, `spl-associated-token-account`.
+- **Description**: The High-Level SDK is our top recommendation for anyone who wants to integrate with the Whirlpool Program. It builds upon the Low-Level and Core SDKs to provide an easy-to-use interface for interacting with the Whirlpool Program. This SDK abstracts many of the underlying complexities, such as tick array management, and makes managing pools and positions, and executing swaps much simpler. It is suitable for developers who need efficient, high-level functionalities and want to minimize manual configuration and management.
 
-The Whirlpools SDK is an open-source library that allows developers to interact with the Whirlpools Program and is intended to be used in conjunction with the Solana SDK. Simply put, you use the Whirlpools SDK to create instructions, and the Solana SDK to send them to the network.
+#### 2. Core SDK
+- **TypeScript**: [@orca-so/whirlpools-core](https://www.npmjs.com/package/@orca-so/whirlpools-core)
+- **Rust**: [orca_whirlpools_core](https://crates.io/crates/orca_whirlpools_core)
+- **Description**: The Core SDK provides essential utilities for math operations and quotes, required for working with liquidity pools. This library focuses on calculations such as determining position status, price conversions, and computing quotes on adjusting liquidity and swaps. It is written in Rust but has been compiled to WebAssembly (Wasm) for easy integration into TypeScript projects.
 
-Some of the main features are:
-- Create instructions to set up a new pool, open positions, add or remove liquidity, and swap tokens.
-- Get quotes for swaps.
-- Query the state of pools to retrieve information about asset prices, liquidity, and fees.
+#### 3. Low-Level SDK
+- **TypeScript**: [@orca-so/whirlpools-client](https://www.npmjs.com/package/@orca-so/whirlpools-client)
+  - Compatible with Solana Web3.js SDK version `^2.0`
+- **Rust**: [orca_whirlpools_client](https://crates.io/crates/orca_whirlpools_client)
+  - Compatible with `anchor` versions `^0.26` but `<0.30`. If you enable the `anchor` feature of `orca_whirlpools_client` in `cargo.toml` while using a version of anchor that's `^0.30` in your project, you may need to apply a lockfile patch to switch to a lower version:
+    ```bash
+    cargo update anchor:<current-version> --precise 0.29
+    ```
+  - Compatible with `solana-program` versions `^1.18.0` but `<3.0.0`. By default, Cargo will install the latest version of Solana SDK `^v2`. This can cause dependcy issues when using older versions. To solve this you can apply a lockfile patch with the following command:
+    ```bash
+    cargo update solana-program:<current-version> --precise <required-version>
+    ```
+  - NOTE: if you are dealing with compatibility issues for both `anchor` and `solana-program`, the order of the patches matters. First patch `anchor`, then patch `solana-program`.
+- **Description**: The Low-Level SDK is autogenerated from the Whirlpool Program's Interface Description Language (IDL) using Codama. This SDK provides direct program interactions and is designed for developers who need complete, low-level control over Whirlpool operations. It covers direct access to Solana accounts, instructions, and transactions.
+
+### Legacy SDK
+- **TypeScript**: [@orca-so/whirlpools-sdk](https://www.npmjs.com/package/@orca-so/whirlpools-sdk) (Requires Solana Web3.js SDK `<v2.0`)
+- **Description**: Despite being called "Legacy", this SDK remains a reliable choice for integrating with projects that use Solana Web3.js versions older than v2.0. It offers foundational tools for interacting with Orca's Whirlpool Program and includes utilities from @orca-so/common-sdk.
 
 ## How to use this documentation
 
-In the next section you will find information about the Whirlpools Program and its architecture.
+In the next section you will find information about the Whirlpool Program and its architecture.
 
-In the following sections you will find information about the Whirlpools SDK and how to use it to interact with the program.
-
-We also provide start-to-end tutorials for specific use cases combining the Whirlpools SDK with the Solana SDK.
+In the following sections you will find documentation on the Whirlpools SDKs and the Legacy SDK and how to use it to interact with the program.
 
 If you have any questions or need help, feel free to reach out to us on the [Discord](https://discord.orca.so).

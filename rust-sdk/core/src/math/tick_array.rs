@@ -1,5 +1,5 @@
 use crate::{
-    ErrorCode, TickArrayFacade, TickFacade, INVALID_TICK_INDEX, MAX_TICK_INDEX, MIN_TICK_INDEX,
+    CoreError, TickArrayFacade, TickFacade, INVALID_TICK_INDEX, MAX_TICK_INDEX, MIN_TICK_INDEX,
     TICK_ARRAY_NOT_EVENLY_SPACED, TICK_ARRAY_SIZE, TICK_INDEX_OUT_OF_BOUNDS, TICK_SEQUENCE_EMPTY,
 };
 
@@ -10,15 +10,15 @@ use super::{
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TickArraySequence<const SIZE: usize> {
-    tick_arrays: [Option<TickArrayFacade>; SIZE],
-    tick_spacing: u16,
+    pub tick_arrays: [Option<TickArrayFacade>; SIZE],
+    pub tick_spacing: u16,
 }
 
 impl<const SIZE: usize> TickArraySequence<SIZE> {
     pub fn new(
         tick_arrays: [Option<TickArrayFacade>; SIZE],
         tick_spacing: u16,
-    ) -> Result<Self, ErrorCode> {
+    ) -> Result<Self, CoreError> {
         let mut tick_arrays = tick_arrays;
         tick_arrays.sort_by_key(start_tick_index);
 
@@ -30,8 +30,8 @@ impl<const SIZE: usize> TickArraySequence<SIZE> {
         for i in 0..tick_arrays.len() - 1 {
             let current_start_tick_index = start_tick_index(&tick_arrays[i]);
             let next_start_tick_index = start_tick_index(&tick_arrays[i + 1]);
-            if next_start_tick_index - current_start_tick_index != required_tick_array_spacing
-                && next_start_tick_index != <i32>::MAX
+            if next_start_tick_index != <i32>::MAX
+                && next_start_tick_index - current_start_tick_index != required_tick_array_spacing
             {
                 return Err(TICK_ARRAY_NOT_EVENLY_SPACED);
             }
@@ -61,7 +61,7 @@ impl<const SIZE: usize> TickArraySequence<SIZE> {
         end_index.min(MAX_TICK_INDEX)
     }
 
-    pub fn tick(&self, tick_index: i32) -> Result<&TickFacade, ErrorCode> {
+    pub fn tick(&self, tick_index: i32) -> Result<&TickFacade, CoreError> {
         if (tick_index < self.start_index()) || (tick_index > self.end_index()) {
             return Err(TICK_INDEX_OUT_OF_BOUNDS);
         }
@@ -81,7 +81,7 @@ impl<const SIZE: usize> TickArraySequence<SIZE> {
     pub fn next_initialized_tick(
         &self,
         tick_index: i32,
-    ) -> Result<(Option<&TickFacade>, i32), ErrorCode> {
+    ) -> Result<(Option<&TickFacade>, i32), CoreError> {
         let array_end_index = self.end_index();
         let mut next_index = tick_index;
         loop {
@@ -100,7 +100,7 @@ impl<const SIZE: usize> TickArraySequence<SIZE> {
     pub fn prev_initialized_tick(
         &self,
         tick_index: i32,
-    ) -> Result<(Option<&TickFacade>, i32), ErrorCode> {
+    ) -> Result<(Option<&TickFacade>, i32), CoreError> {
         let array_start_index = self.start_index();
         let mut prev_index =
             get_initializable_tick_index(tick_index, self.tick_spacing, Some(false));
